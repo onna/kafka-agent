@@ -1,0 +1,16 @@
+{
+    "shared": {
+        "bootstrap_servers": ["localhost:9200"]
+    },
+    "producer": {},
+    "consumer": {
+        "max_partition_fetch_bytes": 10240,
+        "metadata_max_age_ms": 10000
+    },
+    "service": {
+        "activated": false,
+        "host": "localhost",
+        "port": 9753,
+        "cors": {}
+    }
+}
