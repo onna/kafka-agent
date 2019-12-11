@@ -19,3 +19,4 @@ six==1.13.0
 traitlets==4.3.3
 typing-extensions==3.7.4.1
 wcwidth==0.1.7
+aiokafka==0.5.2
