@@ -28,6 +28,7 @@ class CommandRunner:
     kafka-agent agent --config=config.json path.to.agent.func
     kafka-agent consumer --config=config.json path.to.consumer.func
     kafka-agent producer --config=config.json core.model.BaseTopicSchema
+    kafka-agent service --config=config.json --host=0.0.0.0 --port=8080
     """
 
     modules = ["agent", "consumer", "producer"]

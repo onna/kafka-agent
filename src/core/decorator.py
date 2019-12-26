@@ -1,15 +1,15 @@
 import asyncio
+import uuid
 
 from core.component import ConsumerAgentWorker, ConsumerComponent, ProducerComponent
 from core.model import BaseTopicSchema
-from core.service import consumer_registry
 
 
 class consumer:
-    def __init__(self, model: BaseTopicSchema, agent_id: str = None):
+    def __init__(self, model: BaseTopicSchema, agent_id: str = None, group_id=None):
         self.model = model
-        self.client_id = agent_id or f"consumer-cid-{self.model.topic_name()}"
-        self.group_id = f"consumer-cg-{self.model.topic_name()}"
+        self.client_id = agent_id or f"cid-{self.model.topic_name()}"
+        self.group_id = group_id or f"cg-{self.model.topic_name()}"
         self.concurrency = 1
         self.consumers = list()
         self.tasks = list()
@@ -29,7 +29,7 @@ class consumer:
                         **{
                             **self.consumer_config,
                             **{
-                                "client_id": f"consumer-{self.client_id}",
+                                "client_id": f"{self.client_id}-{str(uuid.uuid1())}",
                                 "group_id": self.group_id,
                             },
                         },
@@ -43,7 +43,10 @@ class consumer:
         self.consumer_config = config or {}
 
     async def _start(self):
-        await asyncio.gather(*[consumer.run() for consumer in self.consumers])
+        try:
+            await asyncio.gather(*[consumer.run() for consumer in self.consumers])
+        finally:
+            await self.stop()
 
     async def start(self):
         self.init_consumers()
@@ -55,8 +58,7 @@ class consumer:
 
 
 class agent(consumer):
-    """[summary]
-    
+    """
         @agent(User)
         async def agent_worker(stream: ConsumerComponent):
             async for msg in stream:
@@ -65,13 +67,17 @@ class agent(consumer):
         user = User(name="test", ...)
         agent_worker.configure(...)
         await agent_worker.send(key=user.name, value=user)
-        await agent_worker.consume(from_=None)
+
+        try:
+            await agent_worker.start()
+        finally:
+            await agent_worker.stop()
     """
 
     def __init__(self, model: BaseTopicSchema, agent_id: str = None):
         super().__init__(model, agent_id=agent_id)
         self.client_id = agent_id or f"aggent-cid-{self.model.topic_name()}"
-        self.group_id = f"agent-cg-{self.model.topic_name()}"
+        self.group_id = f"agent-cgid-{self.model.topic_name()}"
 
     def init_producer(self):
         if getattr(self, "producer", None) is None:
@@ -83,25 +89,24 @@ class agent(consumer):
                 },
             )
 
-    def init_service(self):
-        if not self.is_service:
-            return
-        if not hasattr(self, "service_consumer"):
-            self.service_consumer = ConsumerComponent(
-                self.model,
-                **{
-                    **self.consumer_config,
-                    **{
-                        "client_id": f"svc-consumer-{self.client_id}",
-                        "group_id": f"svc-{self.group_id}",
-                    },
-                },
-            )
-            consumer_registry[self.model.topic] = self
+    # def init_service(self):
+    #     if not self.is_service:
+    #         return
+    #     if not hasattr(self, "service_consumer"):
+    #         self.service_consumer = ConsumerComponent(
+    #             self.model,
+    #             **{
+    #                 **self.consumer_config,
+    #                 **{
+    #                     "client_id": f"svc-consumer-{self.client_id}"
+    #                 },
+    #             },
+    #         )
+    #         consumer_registry[self.model.topic] = self
 
     def configure(self, producer_config=None, consumer_config=None, **config):
         self.concurrency = config.pop("concurrency", 1)
-        self.is_service = config.pop("service", False)
+        # self.is_service = config.pop("service", False)
         self.producer_config = producer_config or {}
         self.consumer_config = consumer_config or {}
         self.producer_config = {**self.producer_config, **config}
@@ -110,10 +115,10 @@ class agent(consumer):
 
     async def start(self):
         self.init_consumers()
-        self.init_service()
+        # self.init_service()
         consumer_tasks = [consumer.run() for consumer in self.consumers]
-        if self.is_service:
-            consumer_tasks.append(self.service_consumer.start())
+        # if self.is_service:
+        #     consumer_tasks.append(self.service_consumer.start())
         await asyncio.gather(*consumer_tasks)
 
     async def stop(self):

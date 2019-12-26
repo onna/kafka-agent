@@ -8,9 +8,7 @@
         "metadata_max_age_ms": 10000
     },
     "service": {
-        "activated": false,
-        "host": "localhost",
-        "port": 9753,
-        "cors": {}
+        "cors": {},
+        "models":["core.model.BaseTopicSchema"]
     }
 }

@@ -1,4 +1,5 @@
 import asyncio
+import argparse
 from core.component import ProducerComponent
 from example.model import City, User
 
@@ -11,19 +12,19 @@ async def send(count=100):
     )
     await producer.start()
     try:
-        print(
-            await asyncio.gather(
-                *[
-                    producer.send(
-                        key=f"Onna-{age}",
-                        value=User(
-                            name=f"Onna-{age}", age=age + 1, city=City(name="Durham")
-                        ),
+        result = await asyncio.gather(
+            *[
+                producer.send(
+                    key=f"Onna-{age}",
+                    value=User(
+                        name=f"Onna-{age}", age=age + 1, city=City(name="Durham")
                     )
-                    for age in range(count)
-                ]
-            )
+                )
+                for age in range(count)
+            ]
         )
+        for item in result:
+            print(item.topic_partition, item.offset)
     finally:
         await producer.stop()
 
@@ -50,4 +51,7 @@ async def sync_send(count=100):
 
 
 if __name__ == "__main__":
-    asyncio.run(send())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--count", type=int, default=1)
+    arguments, _ = parser.parse_known_args()
+    asyncio.run(send(arguments.count))

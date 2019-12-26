@@ -1,22 +1,30 @@
 from typing import Dict
-
-from core.core import agent
+from core.decorator import consumer
 from core.model import BaseTopicSchema
-from registry import REGISTRY
-from registry.model import Topic
-
-REGISTRY: Dict[str, BaseTopicSchema] = dict()
+from registry.model import ServiceRegistry
 
 
-@agent(Topic)
-async def registry_agent(stream):
-    async for name, topic in stream.items():
-        REGISTRY.setdefault(name, topic)
+SERVICE_REGISTRY: Dict[str, BaseTopicSchema] = dict()
 
 
-def lookup(name, default=None) -> BaseTopicSchema:
+@consumer(ServiceRegistry)
+async def registry_worker(stream):
+    async for name, schema in stream.items():
+        SERVICE_REGISTRY.setdefault(name, schema)
+
+
+async def start(settings):
+    registry_worker.configure(**settings)
+    await worker.start()
+
+
+def get(name, default=None) -> BaseTopicSchema:
     return REGISTRY.get(name, default=default)
 
 
-async def register(name, model: BaseTopicSchema = None) -> BaseTopicSchema:
-    await registry_agent.send(key=name, value=Topic(name=name, schema=model))
+async def add(model: BaseTopicSchema = None) -> BaseTopicSchema:
+    await registry_agent.send(
+        key=model.topic_name(),
+        value=ServiceRegistry(name=name, schema=model.schema())
+    )
+

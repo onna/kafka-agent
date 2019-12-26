@@ -1,9 +1,3 @@
-async def register_topic(mode, uri):
-    ...
-
-
-async def get_topic(name, uri):
-    ...
 
 
 def resolve_dotted_name(name: str):

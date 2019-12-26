@@ -8,7 +8,6 @@ def topic_name(name):
     def wrapped_f(cls):
         cls._topic = name
         return cls
-
     return wrapped_f
 
 
@@ -18,11 +17,9 @@ def topic_setting(name: str, **config):
         if config:
             cls._topic_config = {
                 "partitions": config.get("partitions", 1),
-                "replicas": config.get("replicas", 2),
                 "ttl": config.get("ttl"),
             }
         return cls
-
     return wrapped_f
 
 

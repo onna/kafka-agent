@@ -1,7 +1,9 @@
-from core.model import BaseTopicSchema, topic_name
+from core.model import BaseTopicSchema, topic_setting
+
+TTL = 3_153_600_000_000
 
 
-@topic_name("agent-topic-registry")
-class Topic(BaseTopicSchema):
+@topic_setting("service-topic-registry", partitions=6, replicas=1, ttl=TTL)
+class ServiceRegistry(BaseTopicSchema):
     name: str
-    schema: BaseTopicSchema
+    json_schema: dict

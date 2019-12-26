@@ -1,5 +1,4 @@
 import asyncio
-
 from core.decorator import agent
 from example.model import City, User
 
@@ -7,7 +6,7 @@ from example.model import City, User
 @agent(User)
 async def agent_worker(stream):
     async for key, user, _ in stream.items(meta=True):
-        print(user.name, _)
+        print(id(stream), key, _)
 
 
 async def send(agent, count=100):
@@ -24,9 +23,9 @@ async def send(agent, count=100):
 
 async def consume(agent):
     try:
-        await agent_worker.start()
+        await agent.start()
     finally:
-        await agent_worker.stop()
+        await agent.stop()
 
 
 async def run(agent):
@@ -37,8 +36,7 @@ async def run(agent):
 if __name__ == "__main__":
     agent_worker.configure(
         bootstrap_servers="kafka-intra01.intra.onna.internal:9092",
-        producer_config={"key_serializer": lambda key: key.encode(),},
-        concurrency=2,
-        service=True,
+        producer_config={"key_serializer": lambda key: key.encode()},
+        concurrency=2
     )
     asyncio.run(run(agent_worker))
