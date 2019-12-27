@@ -1,3 +1,4 @@
+import uvicorn
 import argparse
 import asyncio
 import logging
@@ -5,6 +6,10 @@ import nest_asyncio
 from core.const import banner
 from core.utils import resolve_dotted_name
 from core.component import ProducerComponent
+from core.settings import load_configuration_file
+from core.task_vars import settings, service
+from service import app
+
 
 
 nest_asyncio.apply()
@@ -31,7 +36,7 @@ class CommandRunner:
     kafka-agent service --config=config.json --host=0.0.0.0 --port=8080
     """
 
-    modules = ["agent", "consumer", "producer"]
+    modules = ["agent", "consumer", "producer", "service"]
 
     def __init__(self, description, add_help=True):
         self.parser = argparse.ArgumentParser(
@@ -39,8 +44,8 @@ class CommandRunner:
         )
 
         self.parser.add_argument("module")
-        self.parser.add_argument("src", nargs="+")
-        self.parser.add_argument("-c", "--config")
+        self.parser.add_argument("src", nargs="*")
+        self.parser.add_argument("-c", "--config", type=argparse.FileType('r'), default="config.json")
 
     def get_config(self, name=None):
         return {
@@ -51,29 +56,44 @@ class CommandRunner:
 
     @property
     def producer_config(self):
-        return self.arguments.config.get("producer", {})
+        return self.config.get("producer", {})
 
     @property
     def consumer_config(self):
-        return self.arguments.config.get("consumer", {})
+        return self.config.get("consumer", {})
 
     @property
     def agent_config(self):
         return {
             "producer_config": self.producer_config,
             "consumer_config": self.consumer_config,
-            **self.arguments.config.get("shared", {}),
+            **self.config.get("shared", {}),
         }
 
     @property
     def service_config(self):
-        return self.arguments.config.get("service", {})
+        return self.config.get("service", {})
 
-    async def start_component(component, **config):
-        component.configure(**config)
-        await component.strat()
+    async def start_service(self):
+        print("starting service!")
+        await app.initialize(kafka_brokers=self.config["shared"]["bootstrap_servers"])
+        return uvicorn.run(app, **self.config["service"])
+
+    async def start_agent(self):
+        print(f"starting agent!")
+
+    async def start_consumer(self):
+        print(f"starting consumer!")
 
     async def start_producer(self):
+        print(f"starting producer!")
+
+    async def start_component(self, component, **config):
+        print(f"starting {component}!")
+        # component.configure(**config)
+        # await component.strat()
+
+    async def _start_producer(self):
         from IPython.terminal.embed import InteractiveShellEmbed
         from traitlets.config.loader import Config
 
@@ -104,16 +124,26 @@ class CommandRunner:
         if self.arguments.module not in self.modules:
             raise Exception(f"Invalid command: {self.arguments.module}")
 
-        if self.arguments.module.lower() in ("consumer", "agent"):
-            try:
-                component = resolve_dotted_name(self.arguments.src)
-            except ModuleNotFoundError:
-                raise Exception(f"ModuleNotFoundError: {self.arguments.src}")
+        self.config = load_configuration_file(self.arguments.config)
+        settings.set(self.config)
 
-            config = self.get_config(name=self.arguments.module)
-            await self.start_component(component, **config)
-        elif self.arguments.module.lower() == "producer":
-            await self.start_producer()
+        await {
+            "agent": self.start_agent,
+            "producer": self.start_producer,
+            "consumer": self.start_consumer,
+            "service": self.start_service,
+        }[self.arguments.module.lower()]()
+
+        # if self.arguments.module.lower() in ("consumer", "agent"):
+        #     try:
+        #         component = resolve_dotted_name(self.arguments.src)
+        #     except ModuleNotFoundError:
+        #         raise Exception(f"ModuleNotFoundError: {self.arguments.src}")
+
+        #     config = self.get_config(name=self.arguments.module)
+        #     await self.start_component(component, **config)
+        # elif self.arguments.module.lower() == "producer":
+        #     await self.start_producer()
 
 
 def run():

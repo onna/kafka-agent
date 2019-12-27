@@ -89,24 +89,8 @@ class agent(consumer):
                 },
             )
 
-    # def init_service(self):
-    #     if not self.is_service:
-    #         return
-    #     if not hasattr(self, "service_consumer"):
-    #         self.service_consumer = ConsumerComponent(
-    #             self.model,
-    #             **{
-    #                 **self.consumer_config,
-    #                 **{
-    #                     "client_id": f"svc-consumer-{self.client_id}"
-    #                 },
-    #             },
-    #         )
-    #         consumer_registry[self.model.topic] = self
-
     def configure(self, producer_config=None, consumer_config=None, **config):
         self.concurrency = config.pop("concurrency", 1)
-        # self.is_service = config.pop("service", False)
         self.producer_config = producer_config or {}
         self.consumer_config = consumer_config or {}
         self.producer_config = {**self.producer_config, **config}
@@ -115,10 +99,7 @@ class agent(consumer):
 
     async def start(self):
         self.init_consumers()
-        # self.init_service()
         consumer_tasks = [consumer.run() for consumer in self.consumers]
-        # if self.is_service:
-        #     consumer_tasks.append(self.service_consumer.start())
         await asyncio.gather(*consumer_tasks)
 
     async def stop(self):

@@ -1,5 +1,4 @@
 from core.model import BaseTopicSchema, topic_setting
-from core.service import SERVICE_REGISTRY
 
 class City(BaseTopicSchema):
     name: str

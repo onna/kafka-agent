@@ -1,6 +1,6 @@
 {
     "shared": {
-        "bootstrap_servers": ["localhost:9200"]
+        "bootstrap_servers": ["kafka-intra01.intra.onna.internal:9092"]
     },
     "producer": {},
     "consumer": {
@@ -8,7 +8,16 @@
         "metadata_max_age_ms": 10000
     },
     "service": {
-        "cors": {},
-        "models":["core.model.BaseTopicSchema"]
-    }
+        "host": "0.0.0.0",
+        "port": 7000,
+        "debug": false,
+        "reload": false,
+        "timeout_keep_alive": 20,
+        "proxy_headers": true,
+        "log_level": "info"
+    },
+    "registry": [
+        "example.model.User",
+        "example.model.City"
+    ]
 }

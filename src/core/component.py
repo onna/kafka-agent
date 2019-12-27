@@ -1,17 +1,20 @@
 import asyncio
 import operator
-from dataclasses import dataclass
+import aiokafka
+import jsonschema
 from typing import Dict
 from typing import List
+from typing import Union
 from typing import Coroutine
-import aiokafka
 from core.model import BaseTopicSchema
+
 from kafka.admin import NewTopic
 from kafka.admin import NewPartitions
 from kafka.admin import ConfigResource
 from kafka.admin.client import KafkaAdminClient
 from kafka.errors import TopicAlreadyExistsError
 
+from dataclasses import dataclass
 
 
 class TopicManager(KafkaAdminClient):
@@ -20,8 +23,24 @@ class TopicManager(KafkaAdminClient):
         self.model = model
         super().__init__(**config)
         self.sync_topic()
+        # refresh KafkaAdminClient connection
         self.close()
         super().__init__(**config)
+
+    def sync_topic(self):
+        result = None
+        if hasattr(self.model, "_topic_config"):
+            if self.topic_config is None:
+                result = self.create_topic()
+            if self.topic_config["partitions"] != self.model._topic_config["partitions"]:
+                count = self.model._topic_config["partitions"]
+                result = self.update_partition_count(count)
+            if self.topic_config["ttl"] != self.model._topic_config["ttl"]:
+                ttl = self.model._topic_config["ttl"]
+                result = self.alter_configs(
+                    [ConfigResource('topic', self.topic_name, configs={"retention.ms": ttl})]
+                )
+        return result
 
     @property
     def topic_name(self):
@@ -61,21 +80,6 @@ class TopicManager(KafkaAdminClient):
         except TopicAlreadyExistsError:
             return
 
-    def sync_topic(self):
-        result = None
-        if hasattr(self.model, "_topic_config"):
-            if self.topic_config is None:
-                result = self.create_topic()
-            if self.topic_config["partitions"] != self.model._topic_config["partitions"]:
-                count = self.model._topic_config["partitions"]
-                result = self.update_partition_count(count)
-            if self.topic_config["ttl"] != self.model._topic_config["ttl"]:
-                ttl = self.model._topic_config["ttl"]
-                result = self.alter_configs(
-                    [ConfigResource('topic', self.topic_name, configs={"retention.ms": ttl})]
-                )
-        return result
-
     def update_partition_count(self, count):
         return self.create_partitions({self.topic_name: NewPartitions(total_count=count)})
 
@@ -109,17 +113,20 @@ class ProducerComponent(aiokafka.AIOKafkaProducer):
         self.tm = TopicManager(self.model, bootstrap_servers=self.bootstrap_servers)
         super().__init__(**config)
 
-    @property
-    def json_schema(self):
-        return self.model.schema()
+    async def send(self, value: Union[BaseTopicSchema, Dict] = None, **kwargs):
 
-    async def send(self, value: BaseTopicSchema = None, **kwargs):
-        assert isinstance(value, self.model), "Invalid data type"
+        if isinstance(value, dict):
+            jsonschema.validate(value, self.model.schema())
+            value=json.loads(value).encode()
+        elif isinstance(value, self.model):
+            value=value.json().encode()
+        else:
+            raise Exception("Invalid data")
+
         sent = await super().send(
-            self.model.topic_name(), value=value.json().encode(), **kwargs
+            self.model.topic_name(), value=value, **kwargs
         )
         return await sent
-
 
 class ConsumerComponent(aiokafka.AIOKafkaConsumer):
     def __init__(self, model: BaseTopicSchema, **config):

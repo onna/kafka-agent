@@ -8,13 +8,13 @@ SERVICE_REGISTRY: Dict[str, BaseTopicSchema] = dict()
 
 
 @consumer(ServiceRegistry)
-async def registry_worker(stream):
+async def worker(stream):
     async for name, schema in stream.items():
         SERVICE_REGISTRY.setdefault(name, schema)
 
 
-async def start(settings):
-    registry_worker.configure(**settings)
+async def start(**settings):
+    worker.configure(**settings)
     await worker.start()
 
 
@@ -23,7 +23,7 @@ def get(name, default=None) -> BaseTopicSchema:
 
 
 async def add(model: BaseTopicSchema = None) -> BaseTopicSchema:
-    await registry_agent.send(
+    await worker.send(
         key=model.topic_name(),
         value=ServiceRegistry(name=name, schema=model.schema())
     )
