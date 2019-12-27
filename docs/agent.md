@@ -3,24 +3,13 @@
 import asyncio
 
 from core.decorator import agent
-from core.model import BaseTopicSchema, topic_setting
-
-
-class City(BaseTopicSchema):
-    name: str
-
-
-@topic_setting(name="user-test-topic", partitions=1, replicas=2, ttl=3600000)
-class User(BaseTopicSchema):
-    name: str
-    age: int
-    city: City
+from example.model import City, User
 
 
 @agent(User)
 async def agent_worker(stream):
-    async for key, user in stream.items():
-        print(user.name)
+    async for key, user, _ in stream.items(meta=True):
+        print(user.name, _)
 
 
 async def send(agent, count=100):
@@ -42,6 +31,11 @@ async def consume(agent):
         await agent_worker.stop()
 
 
+async def run(agent):
+    await send(agent)
+    await consume(agent)
+
+
 if __name__ == "__main__":
     agent_worker.configure(
         bootstrap_servers="kafka-intra01.intra.onna.internal:9092",
@@ -49,6 +43,5 @@ if __name__ == "__main__":
         concurrency=2,
         service=True,
     )
-    # asyncio.run(send(agent_worker))
-    # asyncio.run(main(agent_worker))
+    asyncio.run(run(agent_worker))
 ```

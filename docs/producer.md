@@ -1,24 +1,57 @@
 
 ```python
-from core.model import BaseTopicSchema
-from core.core import ProducerComponent
-from core.model import topic_name
+import asyncio
+from core.component import ProducerComponent
+from example.model import City, User
 
 
+async def send(count=100):
+    producer = ProducerComponent(
+        User,
+        key_serializer=lambda key: key.encode(),
+        bootstrap_servers="kafka-intra01.intra.onna.internal:9092",
+    )
+    await producer.start()
+    try:
+        print(
+            await asyncio.gather(
+                *[
+                    producer.send(
+                        key=f"Onna-{age}",
+                        value=User(
+                            name=f"Onna-{age}", age=age + 1, city=City(name="Durham")
+                        ),
+                    )
+                    for age in range(count)
+                ]
+            )
+        )
+    finally:
+        await producer.stop()
 
-class City(BaseTopicSchema):
-    name: str
+
+async def sync_send(count=100):
+    producer = ProducerComponent(
+        User,
+        key_serializer=lambda key: key.encode(),
+        bootstrap_servers="kafka-intra01.intra.onna.internal:9092",
+    )
+    await producer.start()
+    try:
+        for age in range(count):
+            print(
+                await producer.send(
+                    key=f"Onna-{age}",
+                    value=User(
+                        name=f"Onna-{age}", age=age + 1, city=City(name="Durham")
+                    ),
+                )
+            )
+    finally:
+        await producer.stop()
 
 
-@topic_name("user-topic")
-class User(BaseTopicSchema):
-    name: str
-    age: int
-    city: City
+if __name__ == "__main__":
+    asyncio.run(send())
 
-
-producer = ProducerComponent(User, key_serializer=lambda key: key.encode())
-await producer.start()
-user = User(name='Onna', age=5, city=City(name='Durham'))
-r = await producer.send(key=user.name, value=user)
 ```
